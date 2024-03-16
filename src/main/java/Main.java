@@ -21,51 +21,64 @@ public class Main {
        serverSocket = new ServerSocket(4221);
        serverSocket.setReuseAddress(true);
        clientSocket = serverSocket.accept();
-       // handle upcomming connection
          BufferedReader inputStream = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-         Boolean isAccepted = isPathValid(inputStream.readLine());
-
-         clientSocket.getOutputStream().write(HTTP_OK.getBytes());
+         String line = inputStream.readLine();
+         Boolean isAccepted = isPathValid(line);
+         String path = parseRequest(line);
+         System.out.println("path "+ path);
+         returnResp(isAccepted, clientSocket, path);
        System.out.println("accepted new connection");
      } catch (IOException e) {
        System.out.println("IOException: " + e.getMessage());
      }
   }
 
-  private static void returnResp(Boolean isAccepted, Socket clientSocket) {
+  private static void returnResp(Boolean isAccepted, Socket clientSocket,String path) {
       try {
           if (!isAccepted) {
               clientSocket.getOutputStream().write(HTTP_NOT_FOUND.getBytes());
               return;
           } else {
-              clientSocket.getOutputStream().write(HTTP_OK.getBytes());
+              String response =
+                      "HTTP/1.1 200 OK\r\n".concat("Content-Type: text/plain\r\n")
+                              .concat(String.format("Content-Length: %d\r\n", path.length()))
+                              .concat(String.format("\r\n%s\r\n", path));
+                clientSocket.getOutputStream().write(response.getBytes());
           }
       } catch (IOException e) {
           e.printStackTrace();
       }
   }
 
-
-
-
-  private static Boolean isPathValid(String line) {
-      String pattern = "^(\\S+)\\s+(/\\S*).*";
-      Pattern regex  = Pattern.compile(pattern);
-      Matcher matcher = regex.matcher(line);
-
+    private static String parseRequest(String requestLine) {
+        String pattern = "^(\\S+)\\s+(/(\\S+)).*";
+        Pattern regex = Pattern.compile(pattern);
+        Matcher matcher = regex.matcher(requestLine);
         if (!matcher.matches()) {
-            System.out.println("Invalid path");
+            System.out.println("INVALID REQUEST");
+            return "";
+        }
+        String fullPath = matcher.group(2).substring(1);
+        String[] pathParts = fullPath.split("/", 2);
+        return pathParts[1];
+    }
+
+
+    private static boolean isPathValid(String requestLine) {
+        String pattern = "^(\\S+)\\s+(/\\S*).*";
+        Pattern regex = Pattern.compile(pattern);
+        Matcher matcher = regex.matcher(requestLine);
+        if (!matcher.matches()) {
+            System.out.println("INVALID REQUEST");
             return false;
         }
         String path = matcher.group(2);
-        String method = matcher.group(1);
-        System.out.println("method: " + method);
-        if(!path.equals("/")) {
-            System.out.println("Invalid path");
-            return false;
+
+            if (!path.equals("/") && !path.contains("/echo")) {
+                return false;
+            }
+            return true;
         }
-        return true;
-  }
 
 
 }
